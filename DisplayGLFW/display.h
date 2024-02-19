@@ -26,7 +26,7 @@ public:
 //protected:
 private:
 	void operator=(const Display& display) {}
-	Display(const Display& display) {}
+	//Display(const Display& display) {}
 
 	GLFWwindow* m_window;
 	int error;

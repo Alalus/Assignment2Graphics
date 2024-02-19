@@ -2,7 +2,6 @@
 #include <iostream>
 #include "../res/includes/glad/include/glad/glad.h"
 #include "display.h"
-
 Display::Display(int width, int height, const std::string& title)
 {
 	/* Initialize the library */
