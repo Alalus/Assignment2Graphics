@@ -1,76 +1,106 @@
 #include "InputManager.h"
-// #include "../DisplayGLFW/display.h"
 #include "game.h"
-#include "stb_image.h"
+#include "glm/glm.hpp"
+#include "Config.h"
+#include "Ray.h"
 #include <iostream>
-#include "../res/includes/glm/glm.hpp"
-#include "Texture.h"
+#include <vector>
+#include <string>
+#include <fstream>
+#include <sstream>
 
-
+using namespace std;
+using namespace glm;
 int main(int argc, char* argv[])
 {
-	const int DISPLAY_WIDTH = 512;
-	const int DISPLAY_HEIGHT = 512;
-	const float CAMERA_ANGLE = 0.0f;
-	const float NEAR = 1.0f;
-	const float FAR = 100.0f;
+    const int DISPLAY_WIDTH = 800;
+    const int DISPLAY_HEIGHT = 800;
+    const float CAMERA_ANGLE = 0.0f;
+    const float NEAR = 1.0f;
+    const float FAR = 100.0f;
 
-	Game* scn = new Game(CAMERA_ANGLE, (float)DISPLAY_WIDTH / DISPLAY_HEIGHT, NEAR, FAR);
+    Game* scn = new Game(CAMERA_ANGLE, (float)DISPLAY_WIDTH / DISPLAY_HEIGHT, NEAR, FAR);
 
-	Display display(DISPLAY_WIDTH, DISPLAY_HEIGHT, "OpenGL");
+    Display display(DISPLAY_WIDTH, DISPLAY_HEIGHT, "OpenGL");
 
-	Init(display);
+    Init(display);
 
-	scn->Init();
+    scn->Init();
 
-	display.SetScene(scn);
+    display.SetScene(scn);
+    const char* fileName = "../res/txtfiles/custom_scene.txt";
+    //------------------------- step 1: read the scene file and create the scene -------------------------//
 
-	int width, height, numComponents;
-	const char* filePath = "../res/textures/lena256.jpg";
-	unsigned char* data = stbi_load(filePath, &width, &height, &numComponents, 4);
-	if (data == NULL)
-		std::cerr << "Unable to load texture: " << filePath << std::endl;
-	unsigned char* floydFilter = floyd(data, width, height);
-	unsigned char* halftoneFilter = halftone(data, width, height);
-	unsigned char* cannyFilter = canny(data, width, height);
+    Config sceneConfigure = Config();
+    // read the scene file and create the scene
+    sceneConfigure.readSceneFile(fileName, DISPLAY_WIDTH, DISPLAY_HEIGHT);
 
-	stbi_image_free(data);
+    //--------------------------------------------------------------------------------------------------//
 
-	//bottom left
-	scn->AddTexture(2 * width, 2 * height, halftoneFilter);
-	scn->SetShapeTex(0, 0);
-	scn->CustomDraw(1, 0, scn->BACK, true, false, 0);
 
-	//top left
-	scn->AddTexture("../res/textures/lena256.jpg", false);
-	scn->SetShapeTex(0, 1);
-	scn->CustomDraw(1, 0, scn->BACK, false, false, 1);
+    //------------------------- step 2: render the scene -------------------------//
 
-	// bottom right
-	scn->AddTexture(width, height, floydFilter);
-	scn->SetShapeTex(0, 2);
-	scn->CustomDraw(1, 0, scn->BACK, false, false, 2);
+    int imageWidth = sceneConfigure.imageWidth, imageHeight = sceneConfigure.imageHeight;
+    // create a matrix to store the color of each pixel
+    std::vector<std::vector<vec4>> pixelColorMatrix(imageHeight, std::vector<vec4>(imageWidth));
 
-	// top right
-	scn->AddTexture(width, height, cannyFilter);
-	scn->SetShapeTex(0, 3);
-	scn->CustomDraw(1, 0, scn->BACK, false, false, 3);
+    // run through each pixel and calculate the color of the pixel 
+    for (int j = 0; j < imageHeight; j++) {
+        for (int i = 0; i < imageWidth; i++) {
 
-	scn->Motion();
-	display.SwapBuffers();
-	while (!display.CloseWindow())
-	{
-		//scn->Draw(1,0,scn->BACK,true,false);
-		//scn->Motion();
-		//display.SwapBuffers();
-		display.PollEvents();
+            vec4 pixelColor;
 
-	}
-	delete scn;
-	// Free the memory allocated by filter functions
-	delete[] floydFilter;
-	delete[] halftoneFilter;
-	delete[] cannyFilter;
+            if (sceneConfigure.bonusFlag < 1.0) {
+                // ConstructRayThroughPixel is a function that returns a ray that goes through the pixel (i, j)
+                Ray ray = sceneConfigure.ConstructRayThroughPixel(i, j, 0);
 
-	return 0;
+                // FindIntersection is a function that returns the first intersection of the ray with the scene
+                Hit hit = sceneConfigure.FindIntersection(ray, -1);
+
+                // GetColor is a function that returns the color of the pixel (i, j)
+                pixelColorMatrix[j][i] = sceneConfigure.GetColor(ray, hit, 0);
+            }
+            //Bonus
+            else {
+                for (int currentExtraRay = 1; currentExtraRay < 5; currentExtraRay++) {
+                    Ray currentRay = sceneConfigure.ConstructRayThroughPixel(i, j, currentExtraRay);
+                    Hit currentHit = sceneConfigure.FindIntersection(currentRay, -1);
+                    vec4 currentPixelColor = sceneConfigure.GetColor(currentRay, currentHit, 0);
+                    pixelColor += currentPixelColor;
+                }
+                pixelColor = pixelColor / 4.0f; // average the color of the 4 rays
+            }
+        }
+    }
+    // create an image from the pixelColorMatrix and add it to the scene as a texture 
+
+
+
+    unsigned char* image = new unsigned char[imageWidth * imageHeight * 4];
+    int index = 0;
+    // fill the image array with the pixelColorMatrix values
+    for (int i = 0; i < imageHeight; i++) {
+        for (int j = 0; j < imageWidth; j++) {
+            image[index] = (unsigned char)(pixelColorMatrix[i][j].x * 255);
+            image[index + 1] = (unsigned char)(pixelColorMatrix[i][j].y * 255);
+            image[index + 2] = (unsigned char)(pixelColorMatrix[i][j].z * 255);
+            image[index + 3] = (unsigned char)(pixelColorMatrix[i][j].w * 255);
+            index += 4;
+        }
+
+    }
+
+    // add the image to the scene as a texture
+    scn->AddTexture(imageWidth, imageHeight, image);
+
+    while (!display.CloseWindow())
+    {
+        scn->Draw(1, 0, scn->BACK, true, false);
+        scn->Motion();
+        display.SwapBuffers();
+        display.PollEvents();
+
+    }
+    delete scn;
+    return 0;
 }
