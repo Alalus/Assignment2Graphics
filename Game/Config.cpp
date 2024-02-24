@@ -10,6 +10,7 @@
 #include <vector>
 #include <sstream>
 #include <memory>
+#include <cmath> 
 
 
 class SceneParser {
@@ -227,63 +228,53 @@ vec3 Config::HandleReflectiveObject(const Hit& hit, const Ray& ray, int depth) {
     return vec3(0.0, 0.0, 0.0); // Default color for space
 }
 
-// Handles refraction for transparent objects
+
+vec3 CalculateRefractionDirection(const vec3& incident, const vec3& normal, float eta) { 
+    float cosi = dot(-incident, normal); // cosi = -N*I
+    float cost2 = 1.0f - eta * eta * (1.0f - cosi * cosi); // snell's law
+    if (cost2 < 0.0f) return vec3(0.0, 0.0, 0.0);// internal reflection
+    return eta * incident + (eta * cosi - sqrt(cost2)) * normal; // refraction direction calculation 
+}
+
+// Checks if the ray is entering or outing the object
+bool IsEntering(const vec3& incident, const vec3& normal) {
+    return dot(incident, normal) < 0;
+}
+
 vec3 Config::HandleTransparentObject(const Hit& hit, const Ray& ray, int depth) {
-    if (depth >= 5) return vec3(0.0, 0.0, 0.0); // Recursion limit to prevent infinite loops
+    if (depth >= 5) return vec3(0.0, 0.0, 0.0); // Recursion limit
 
-    // Initialization for transparent color
-    vec4 transparencyColor = vec4(0.0, 0.0, 0.0, 0.0);
+    float air = 1.0; 
+    float material = 1.5; 
+    float eta = air / material; // snell's law fraction
+    vec3 normal = hit.object->getNormal(hit.hitPoint);
 
-    // Transparent Plane
-    if (hit.object->objectDetails.w < 0.0) {
-        Ray rayThrough(ray.direction, hit.hitPoint);
-        Hit transparencyHit = FindIntersection(rayThrough, hit.object->objectIndex);
+    // Adjust eta and normal based on ray direction
+    if (!IsEntering(ray.direction, normal)) {
+        std::swap(air, material);
+        eta = air / material;
+        normal = -normal; // Invert normal
+    }
 
-        if (transparencyHit.object->objectType != Space) {
-            transparencyColor = GetColor(rayThrough, transparencyHit, depth + 1);
+    vec3 refractedDirection = CalculateRefractionDirection(ray.direction, normal, eta);
+    if (refractedDirection.length() == 0.0f) { // Handle total internal reflection
+        vec3 reflectionDirection = CalculateReflectionDirection(ray.direction, normal);
+        Ray reflectionRay(reflectionDirection, hit.hitPoint + reflectionDirection * 0.001f); // offset to prevent self-intersection
+        Hit reflectedHit = FindIntersection(reflectionRay, hit.object->objectIndex);
+        if (reflectedHit.object->objectType != Space) { // If the reflected ray hits an object
+            return vec3(GetColor(reflectionRay, reflectedHit, depth + 1));
         }
     }
     else {
-        // Handling refraction using Snell's law
-        float refractiveIndex = 1.5f; // Assuming glass or a similar material
-        float snellFrac = 1.0f / refractiveIndex;
-
-        vec3 normal = hit.object->getNormal(hit.hitPoint);
-        float cosFrom = dot(normal, -ray.direction);
-        // Check for total internal reflection
-        if ((1 - pow(snellFrac, 2) * (1 - pow(cosFrom, 2))) < 0) {
-            return vec3(0.0, 0.0, 0.0); // Reflect internally, no refraction occurs
+        // Continue with refraction
+        Ray refractedRay(refractedDirection, hit.hitPoint + refractedDirection * 0.001f); // Offset to prevent self-intersection
+        Hit refractedHit = FindIntersection(refractedRay, -1);
+        if (refractedHit.object->objectType != Space) {
+            return vec3(GetColor(refractedRay, refractedHit, depth + 1));
         }
-        else {
-            vec3 rayDirection = refract(ray.direction, normal, snellFrac);
-            Ray rayIn(rayDirection, hit.hitPoint + rayDirection); // Offset to avoid self-intersection
-
-            Hit transparencyHit = FindIntersection(rayIn, -1);
-
-            if (transparencyHit.object->objectIndex != hit.object->objectIndex) {
-                transparencyColor = GetColor(rayIn, transparencyHit, depth + 1);
-            }
-            else {
-                // Handle exiting the object
-                float t = hit.object->FindIntersection(rayIn);
-                if (t > 0.0f) { // Valid intersection
-                    vec3 secondHitPoint = rayIn.position + rayDirection * t;
-                    normal = -hit.object->getNormal(secondHitPoint); // Flip normal for exiting ray
-                    rayDirection = refract(rayDirection, normal, refractiveIndex); // Refract out of the object
-
-                    Ray rayOut(rayDirection, secondHitPoint + rayDirection); // Offset to avoid self-intersection
-                    Hit transparencyHitOut = FindIntersection(rayOut, hit.object->objectIndex);
-
-                    if (transparencyHitOut.object->objectType != Space) {
-                        transparencyColor = GetColor(rayOut, transparencyHitOut, depth + 1);
-                    }
-                }
-                }
-            }
-        }
-    return vec3(transparencyColor);
-
- }
+    }
+    return vec3(0.0, 0.0, 0.0); // Default color if no interaction
+}
 
 
 // Utility function to calculate reflection direction

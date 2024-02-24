@@ -28,7 +28,7 @@ int main(int argc, char* argv[])
     scn->Init();
 
     display.SetScene(scn);
-    const char* fileName = "../res/txtfiles/custom_scene.txt";
+    const char* fileName = "../res/txtfiles/scene3.txt";
     //------------------------- step 1: read the scene file and create the scene -------------------------//
 
     Config sceneConfigure = Config();
