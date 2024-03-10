@@ -36,7 +36,6 @@ public:
 	virtual void WhenRotate() {};
 	virtual void Motion() {};
 	virtual void Draw(int shaderIndx, int cameraIndx, int buffer, bool toClear, bool debugMode);
-	virtual void CustomDraw(int shaderIndx, int cameraIndx, int buffer, bool toClear, bool debugMode, int screenNum);
 	virtual ~Scene(void);
 
 	void MoveCamera(int cameraIndx, int type, float amt);
@@ -64,6 +63,9 @@ public:
 	inline void SetShapeTex(int shpIndx, int texIndx) { shapes[shpIndx]->SetTexture(texIndx); }
 	inline void SetShapeShader(int shpIndx, int shdrIndx) { shapes[shpIndx]->SetShader(shdrIndx); }
 
+	// New methods
+	std::vector<Shape*>  GetShapes() { return shapes; }
+
 private:
 
 	std::vector<Camera*> cameras;
@@ -83,3 +85,4 @@ protected:
 
 	bool isActive;
 };
+

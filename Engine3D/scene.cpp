@@ -114,55 +114,6 @@ void Scene::Draw(int shaderIndx, int cameraIndx, int buffer, bool toClear, bool 
 	pickedShape = p;
 }
 
-void Scene::CustomDraw(int shaderIndx, int cameraIndx, int buffer, bool toClear, bool debugMode, int screenNum)
-{
-	glEnable(GL_DEPTH_TEST);
-	glm::mat4 Normal = MakeTrans();
-
-	glm::mat4 MVP = cameras[cameraIndx]->GetViewProjection() * glm::inverse(cameras[cameraIndx]->MakeTrans());
-	int p = pickedShape;
-	if (toClear)
-	{
-		if (shaderIndx > 0)
-			Clear(1, 1, 1, 1);
-		else
-			Clear(0, 0, 0, 0);
-	}
-	if (screenNum == 0) {
-		glViewport(0, 0, 256, 256);
-	}
-	else if (screenNum == 1) {
-		glViewport(0, 256, 256, 256);
-	}
-	else if (screenNum == 2) {
-		glViewport(256, 0, 256, 256);
-	}
-	else if (screenNum == 3) {
-		glViewport(256, 256, 256, 256);
-	}
-
-	for (unsigned int i = 0; i < shapes.size(); i++)
-	{
-		if (shapes[i]->Is2Render())
-		{
-			glm::mat4 Model = Normal * shapes[i]->MakeTrans();
-
-			if (shaderIndx > 0)
-			{
-				Update(MVP, Model, shapes[i]->GetShader());
-				shapes[i]->Draw(shaders, textures, false);
-			}
-			else
-			{ //picking
-				Update(MVP, Model, 0);
-				shapes[i]->Draw(shaders, textures, true);
-			}
-		}
-	}
-	pickedShape = p;
-}
-
-
 void Scene::MoveCamera(int cameraIndx, int type, float amt)
 {
 	switch (type)
@@ -243,19 +194,24 @@ void Scene::MouseProccessing(int button)
 		if (button == 1)
 		{
 
-			MyTranslate(glm::vec3(-xrel / 20.0f, 0, 0), 0);
-			MyTranslate(glm::vec3(0, yrel / 20.0f, 0), 0);
+			MoveCamera(0, xTranslate, -xrel / 20.0f);
+			MoveCamera(0, yTranslate, yrel / 20.0f);
+
 			WhenTranslate();
 		}
 		else
 		{
-			MyRotate(xrel / 2.0f, glm::vec3(1, 0, 0), 0);
-			MyRotate(yrel / 2.0f, glm::vec3(0, 0, 1), 0);
+
+			glm::mat4 rot = getRotate();
+			glm::mat3 rot_transpose = glm::transpose(glm::mat3(rot));
+
+			MyRotate(xrel / 2.0f, rot_transpose * glm::vec3(0, -1, 0), 0);
+			MyRotate(yrel / 2.0f, rot_transpose * glm::vec3(-1, 0, 0), 0);
+
 			WhenRotate();
 		}
 	}
 }
-
 void Scene::ZeroShapesTrans()
 {
 	for (unsigned int i = 0; i < shapes.size(); i++)
@@ -314,3 +270,6 @@ Scene::~Scene(void)
 	}
 
 }
+
+
+

@@ -2,6 +2,9 @@
 #include <iostream>
 #include <glm/gtc/matrix_transform.hpp>
 
+
+
+
 static void printMat(const glm::mat4 mat)
 {
 	std::cout << " matrix:" << std::endl;
@@ -15,24 +18,49 @@ static void printMat(const glm::mat4 mat)
 
 Game::Game() : Scene()
 {
+
 }
 
 Game::Game(float angle, float relationWH, float near1, float far1) : Scene(angle, relationWH, near1, far1)
 {
+
+
 }
 
 void Game::Init()
 {
-
+	if (cube == nullptr)
+	{
+		cube = new Rubik();
+	}
 	AddShader("../res/shaders/pickingShader");
 	AddShader("../res/shaders/basicShader");
 
-	//AddTexture("../res/textures/lena256.jpg",false);
-	//AddTexture("../res/textures/lena256.jpg", false);
+	AddTexture("../res/textures/plane.png", false);
+
+	int size = 3;
+	float distance = 1;
+	int index = 0;
+																	
+	for (float i = -distance; i <= distance; i += 1)
+	{
+		for (float j = -distance; j <= distance; j += 1)
+		{
+			for (float k = -distance; k <= distance; k += 1)
+			{
+				AddShape(Scene::Cube, -1, Scene::TRIANGLES);
+				SetShapeTex(index, 0);
+				shapes[index]->MyTranslate(glm::vec3(i, j, k), 0);
+				shapes[index]->MyScale(glm::vec3(0.5, 0.5, 0.5));
+				cube->setCube(i + 1, j + 1, k + 1, index);
+				index++;
+			}
+		}
+	}
+	cube->printCube();
 
 
 	AddShape(Plane, -1, TRIANGLES);
-
 	pickedShape = 0;
 
 	SetShapeTex(0, 0);
@@ -71,6 +99,8 @@ void Game::Motion()
 {
 	if (isActive)
 	{
+
+
 	}
 }
 
